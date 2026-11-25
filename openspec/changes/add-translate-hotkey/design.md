@@ -59,7 +59,8 @@ The Non-Goals of `proposal.md` apply. In addition, this design does not make the
 | D18 | The current clipboard text is read. The Windows clipboard history is not used. | Falling back to `GetHistoryItemsAsync` when the clipboard holds no text: it works on this machine, but it adds a WinRT dependency for a rare case. | A picture or a file on the clipboard ends the run silently. |
 | D19 | There is no "translating" card. The card appears with the result. | A placeholder card while waiting: a flash for most texts, since the answer takes one to two seconds. | The first feedback is the result. |
 | D20 | The TTS engine is started when the phone app starts. | Starting it at the first tap: the first tap would fail with not ready. | An idle connection to the engine while the panel is open. |
-| D21 | The card sits at the bottom centre, z-index 16, at most 60vh high, and scrolls inside. | The top of the screen: it covers the clock and status widgets. A full-screen card: too heavy for a sentence. | It is above the page overview (15) and below the page-pause overlay (18), the toast (20) and an approval prompt (90). |
+| D21 | The card sits at the bottom centre, z-index 16, at most 60vh high, and scrolls inside. | The top of the screen: it covers the clock and status widgets. A full-screen card: too heavy for a sentence. | It is above the page overview (15) and below the page-pause overlay (18), the toast (20) and an approval prompt (90). Superseded by D26 after the owner saw the real size on the phone. |
+| D26 | After seeing the card on the phone the owner asked for the largest possible display: the card is near full screen (1.5 vw margins, vertically centred, at most 88 vh high) with 28 px source text and 34 px translation. | Keeping the toast-sized card (D21): the 13.5 px text is unreadable across a desk. Enlarging only the fonts inside the small card: a big type in a small box is worse than a big box. | It still sits below the page-pause overlay, toast and approval prompt, and scrolls inside when the text is longer than 88 vh. |
 | D22 | The agent is built on this machine with the .NET 10 SDK. The APK comes from the `build` workflow in a fork. | Both from CI: a slow loop for the agent, where the hotkey and the translation logic live. A local JDK and Android SDK: the owner chose CI. | The agent and the APK come from the same commit. |
 | D23 | About 18 new interface texts, in all 23 languages. | English only: it fails the i18n coverage test, and the owner's panel is in Chinese. | The translations are written in this change and checked by the existing tests. |
 | D24 | Logs record the length, the duration and the outcome of a translation, and exception type names. Never the text, never an exception message. | The usual `ex.Message`: a JSON or HTTP exception can quote the request. | A unit test checks that the text never reaches a log. |
@@ -127,12 +128,15 @@ Logs: stage 2 to 6 write one line with the length, the duration and the outcome.
 ### The Translate card (panel)
 
 ```text
-┌──────────────────────────────────────────────────────────┐
-│  The quick brown fox jumps over                 [🔊]     │  ← source text, wraps and scrolls
-│  the lazy dog.                                           │
-│  敏捷的棕色狐狸跳过了懒狗。                                 │  ← Chinese translation
-└──────────────────────────────────────────────────────────┘
-            bottom centre of the panel, z-index 16, at most 60vh high
+┌──────────────────────────────────────────────────────────────┐
+│                                                              │
+│  The quick brown fox jumps over                      [🔊]    │  ← source text, 28 px, wraps and scrolls
+│  the lazy dog.                                               │
+│                                                              │
+│  敏捷的棕色狐狸跳过了懒狗。                                    │  ← Chinese translation, 34 px
+│                                                              │
+└──────────────────────────────────────────────────────────────┘
+   near full screen (1.5 vw margins, vertically centred, ≤ 88 vh), z-index 16
 ```
 
 | State | What is on screen |
