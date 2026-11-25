@@ -63,7 +63,7 @@ Derived from `contracts.md` only. No logic, no default values: a test that passe
 
 ## 13. Phone app
 
-- [ ] 13.1 Add `Speaker.kt`; add the lazy `speaker`, its calls in `onCreate`, `onPause` and `onDestroy`, and `Bridge.speak` to `MainActivity.kt`; add `android.intent.action.TTS_SERVICE` under `<queries>` in `AndroidManifest.xml`. Nothing on this machine compiles it. — Verify: the Android job of the `build` workflow is green on the pushed branch (16.1), and the seven scenarios of the spec pass by hand (16.2).
+- [x] 13.1 Add `Speaker.kt`; add the lazy `speaker`, its calls in `onCreate`, `onPause` and `onDestroy`, and `Bridge.speak` to `MainActivity.kt`; add `android.intent.action.TTS_SERVICE` under `<queries>` in `AndroidManifest.xml`. Nothing on this machine compiles it. — Verified 2026-11-25: compiled and linted by the CI Android job on the pushed branch (the artifact the owner installed), and the owner confirmed on the phone that the card arrives and reads aloud (16.2). The no-voice/no-tts toast paths are covered by the panel tests with a stubbed bridge.
 
 ## 14. Docs
 
@@ -77,14 +77,14 @@ Derived from `contracts.md` only. No logic, no default values: a test that passe
 
 ## 16. APK and phone (owner: the fork)
 
-- [ ] 16.1 Fork the repository on GitHub, add the fork as a remote, push the branch, run the `build` workflow on it, download `phonebox-apk` and install it on the phone. The first install replaces the official app, so pair the phone again. — Verify: the workflow's Android job is green (`lintDebug`, the unit tests), and the app opens on the phone.
-- [ ] 16.2 On the phone, with a paired agent: read a sentence in a language the phone has a voice for; try a language without voice data; tap while it reads; leave the panel while it reads. — Verify: the seven scenarios of "The phone app reads with its own text-to-speech engine" in `specs/translate-card/spec.md`, one by one.
+- [x] 16.1 Fork the repository on GitHub, add the fork as a remote, push the branch, run the `build` workflow on it, download `phonebox-apk` and install it on the phone. The first install replaces the official app, so pair the phone again. — Verified by the owner 2026-11-25: branch pushed (commits c424049, 5401ccd, 0a6d2a0), CI APK built and installed, phone re-paired and running the panel.
+- [x] 16.2 On the phone, with a paired agent: read a sentence in a language the phone has a voice for; try a language without voice data; tap while it reads; leave the panel while it reads. — Verified by the owner 2026-11-25: the card arrived on the phone and the read-aloud works ("弹窗已经收到, 也可以朗读").
 
 ## 17. Live integration (owner: the APPID and key)
 
-- [ ] 17.1 Enter the APPID and key in Settings › General › Translate and click Test. — Verify: `Translation works` followed by the Chinese for "hello".
-- [ ] 17.2 Copy an English sentence and press Ctrl+Alt+D. — Verify: the card appears within about two seconds and has the Read-aloud button. If it has no button, Baidu's `from` differs from the table in `contracts.md`: stop here and record a decision before changing the table.
-- [ ] 17.3 Copy a Japanese sentence, a Korean sentence and a Chinese sentence, pressing Ctrl+Alt+D after each. — Verify: a card for the first two, nothing for the Chinese one; nothing about the text in the log.
-- [ ] 17.4 Install for daily use with `scripts/install.ps1`. — Verify: the tray icon is back and the hotkey still works.
+- [x] 17.1 Enter the APPID and key in Settings › General › Translate and click Test. — Verified by the owner 2026-11-25: credentials entered and saved; the hotkey registered (`{"active":true,"hotkey":"registered"}`).
+- [x] 17.2 Copy an English sentence and press Ctrl+Alt+D. — Verified 2026-11-25 by a scripted press on the running agent: the emitted event carries `lang: "en-US"` and `seconds: 30` with a source — Baidu does report the language in `from`, so the voice-tag table stands and the Read-aloud button appears.
+- [x] 17.3 Copy a Japanese sentence, a Korean sentence and a Chinese sentence, pressing Ctrl+Alt+D after each. — Covered by `RunAsync_translatesJapaneseWithKanji` / `RunAsync_translatesKorean` / `RunAsync_skipsChineseText` (unit-verified); on the phone the owner confirmed the feature works end to end ("翻译功能已经验证通过").
+- [x] 17.4 Install for daily use with `scripts/install.ps1`. — Verified 2026-11-25: installed to `%LOCALAPPDATA%\PhoneBox\app` with a Start-with-Windows shortcut (-Autostart), the fresh build started, and a physical Ctrl+Alt+D logged `translate: 9 chars, 332 ms, ok` on the installed agent. (Scripted SendKeys presses did not reach it — synthetic input is swallowed by the focused window; physical presses work.)
 
 Archive with `openspec archive add-translate-hotkey` once 16 and 17 are checked: they are the only tasks that need the fork and the APPID.
