@@ -9,10 +9,14 @@
     <!-- Dictation widget only: asked for the first time its microphone button is tapped -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
 
-    <!-- Android 11+: the speech recognizer has to be visible to the app (Dictation widget) -->
+    <!-- Android 11+: the speech recognizer and the text-to-speech engine have to be visible to the app
+         (Dictation widget, Translate card) -->
     <queries>
         <intent>
             <action android:name="android.speech.RecognitionService" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.TTS_SERVICE" />
         </intent>
     </queries>
 

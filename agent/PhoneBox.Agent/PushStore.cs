@@ -6,7 +6,7 @@ namespace PhoneBox.Agent;
 
 public sealed record PushItem(JsonElement Data, long At, long? ExpiresAt);
 
-/// <param name="Kind">notify | goto | back | refresh | reload | approval | approval-done</param>
+/// <param name="Kind">notify | goto | back | refresh | reload | approval | approval-done | translate</param>
 public sealed record PanelEvent(long Seq, string Kind, JsonElement? Data, long At);
 
 /// <summary>

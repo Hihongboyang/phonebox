@@ -907,6 +907,13 @@
       }
       return json(await config(), 200, { 'X-Config-Version': String(cfgVersion()) });
     }
+    // Settings › Translate (the demo has no hotkey, and no Baidu account: the test always "works")
+    if (path === '/api/translate/test' && method === 'POST') return json({ result: '你好' });
+    if (path === '/api/translate/status') {
+      const c = await config();
+      const ready = !!(c.translate?.enabled && c.translate?.appId && c.translate?.key);
+      return json({ active: ready, hotkey: ready ? 'registered' : 'off' });
+    }
     if (path === '/api/info') return json({ version: VERSION, os: 'windows', configPath: 'browser storage (demo)', logPath: '—', adb: 'demo', connected: true, devices: ['DEMO0001'], appMissing: [], usbProblem: null, webviewProblem: null });
     // Pairing over Wi-Fi: a placeholder pattern instead of real QR codes (the demo has no agent to pair with)
     if (path === '/api/pair/start' && method === 'POST') {

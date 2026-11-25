@@ -78,6 +78,11 @@ builder.Services.AddSingleton<ApprovalStore>();
 builder.Services.AddSingleton<HomeAssistant>();
 builder.Services.AddSingleton<AppConsole>();
 builder.Services.AddSingleton<Dictation>();
+builder.Services.AddSingleton<BaiduTranslate>();
+// the translate hotkey needs its own message loop: StartAsync builds it, StopAsync ends it
+builder.Services.AddSingleton<Hotkeys>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<Hotkeys>());
+builder.Services.AddSingleton<TranslateService>();
 builder.Services.AddSingleton<SpectrumAnalyzer>();
 AddMonitor<SystemMonitor>(builder.Services);
 AddMonitor<MediaMonitor>(builder.Services);
@@ -108,6 +113,8 @@ builder.Services.AddHostedService<Tray>();
 
 var app = builder.Build();
 
+// the Translate hotkey is registered once the agent is up, and again after every settings save
+app.Lifetime.ApplicationStarted.Register(() => app.Services.GetRequiredService<TranslateService>().Start());
 app.MapGet("/api/controls/state", async (ControlDeck deck, CancellationToken ct) => Results.Json(await deck.Snapshot(ct)));
 app.MapPost("/api/controls/command/{kind}", async (string kind, string? id, string? op, int? value, bool? muted,
     string? lease, ControlDeck deck, CancellationToken ct) => Results.Json(await deck.Act(kind, id, op, value, muted, lease, ct)));
@@ -407,14 +414,14 @@ app.MapGet("/api/settings", (HttpRequest req, ConfigStore cfg, HttpResponse res)
     if (req.HttpContext.Connection.LocalPort == Port && !desktopSettingsFetch)
     {
         var publicConfig = JsonSerializer.SerializeToNode(config, ConfigStore.WriteOpts)?.AsObject();
-        if (publicConfig?["steam"] is JsonObject steam) steam.Remove("apiKey");
+        ConfigStore.RemoveSecrets(publicConfig);
         json = publicConfig?.ToJsonString(ConfigStore.WriteOpts) ?? json;
     }
     res.Headers["X-Config-Version"] = cfg.Version.ToString();
     return Results.Text(json, "application/json; charset=utf-8");
 });
 
-app.MapPut("/api/settings", async (HttpRequest req, ConfigStore cfg, ControlDeck deck, PhotoFrame photos, CameraFeeds cameras, ShortcutIconUploads icons, ILogger<Program> log, CancellationToken ct) =>
+app.MapPut("/api/settings", async (HttpRequest req, ConfigStore cfg, TranslateService translate, ControlDeck deck, PhotoFrame photos, CameraFeeds cameras, ShortcutIconUploads icons, ILogger<Program> log, CancellationToken ct) =>
 {
     if (req.ContentType?.StartsWith("application/json") != true) return Results.StatusCode(415);
     using var r = new StreamReader(req.Body);
@@ -427,9 +434,10 @@ app.MapPut("/api/settings", async (HttpRequest req, ConfigStore cfg, ControlDeck
     AgentConfig? proposed = null;
     try { proposed = JsonSerializer.Deserialize<AgentConfig>(body, ConfigStore.ReadOpts); }
     catch (JsonException) { }
-    // /api/settings redacts Steam's key for callers that are not the same-origin desktop page.
+    // /api/settings redacts the Steam and the Baidu Translate keys for callers that are not the same-origin desktop page.
     // Keep the configured secret if that redacted (or older) client sends it back as missing/null.
-    if (ConfigStore.PreserveSteamApiKey(proposed, cfg.Get().Steam.ApiKey))
+    if (ConfigStore.PreserveSteamApiKey(proposed, cfg.Get().Steam.ApiKey) |
+        ConfigStore.PreserveTranslateKey(proposed, cfg.Get().Translate.Key))
         body = JsonSerializer.Serialize(proposed, ConfigStore.WriteOpts);
     if (proposed?.Steam is { } steam)
     {
@@ -456,6 +464,7 @@ app.MapPut("/api/settings", async (HttpRequest req, ConfigStore cfg, ControlDeck
     if (err is not null) return Results.BadRequest(new { error = err });
     deck.StopDisabledControls();
     photos.SettingsSaved();
+    translate.SettingsSaved();
     cameras.SettingsSaved();
     deck.ReconcileRadios(waitForGate: true);
     icons.Cleanup(() => cfg.Get().Shortcuts.Select(s => s.Id)); // drop uploads for shortcuts that got deleted
@@ -463,6 +472,15 @@ app.MapPut("/api/settings", async (HttpRequest req, ConfigStore cfg, ControlDeck
     log.LogInformation("settings saved");
     return Results.Ok(new { version = savedVersion.ToString(CultureInfo.InvariantCulture) });
 });
+
+// Settings › General › Translate: check the credentials and show the hotkey's state. Local only (the phone has
+// nothing to do with Baidu's credentials, and the same-origin rule keeps everyone else out).
+app.MapPost("/api/translate/test", async (TranslateTestRequest? body, TranslateService translate, CancellationToken ct) =>
+{
+    var (result, error) = await translate.TestAsync(body?.AppId, body?.Key, ct);
+    return error is null ? Results.Json(new { result }) : Results.Json(new { error }, statusCode: StatusCodes.Status400BadRequest);
+});
+app.MapGet("/api/translate/status", (TranslateService translate) => Results.Json(translate.Status()));
 
 // Narrow write path for the phone: only the text of a Note widget may be changed.
 // The text travels in the query string: the Android proxy forwards no request body.

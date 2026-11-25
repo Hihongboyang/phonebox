@@ -189,6 +189,22 @@ Songs without timed lyrics show their plain lyrics, unless you turn that off. A 
 timeline in Now playing) gets the words as a page, with a note that the lines can't follow the song. *Timing offset*
 moves the lines earlier (positive) or later when a song's timing is off.
 
+## Translate hotkey
+
+Copy a word or a sentence anywhere on the computer, press **Ctrl+Alt+D**, and its Chinese translation appears on the
+phone for 30 seconds, with one button that reads the original aloud through the phone's own text-to-speech engine (a
+second tap stops it). The phone needs voice data for the language — see its text-to-speech settings — and an older
+phone app simply leaves the button out.
+
+The text goes to [Baidu Translate](https://fanyi-api.baidu.com) only when you press the hotkey, and it is off by
+default: create an APPID and key there, enter them in **Settings › General › Translate** and turn it on. **Test**
+there tells you at once whether the credentials work, and the settings show when another program owns the hotkey you
+entered — pick another one, such as `ctrl+shift+t`.
+
+Text that is already Chinese is not translated. Text longer than the **Longest text** setting (1000 characters,
+Baidu's limit for a free account) is cut, and a free account allows one request a second: rapid presses translate
+only the last one.
+
 ## Layout editor & settings
 
 Double-click the tray icon on Windows (or open <http://127.0.0.1:8765>):

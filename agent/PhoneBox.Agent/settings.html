@@ -693,6 +693,19 @@ nav a.on::before { color: var(--accent); }
       </div>
 
       <div class="card">
+        <h3 data-i18n="s.translate.title">Translate (Baidu Translate)</h3>
+        <div class="row" style="margin-bottom:8px"><label class="switch"><input type="checkbox" data-bind="translate.enabled" aria-labelledby="translateEnabledLabel"><span></span></label> <span id="translateEnabledLabel" data-i18n="s.translate.enable">Translate the clipboard with a hotkey and show it on the phone</span></div>
+        <p class="hint" style="margin:0 0 12px" data-i18n-html="s.translate.hint">Create an <b>APPID</b> and key at <a href="https://fanyi-api.baidu.com" target="_blank" rel="noreferrer">fanyi-api.baidu.com</a> and enter them here (Windows only). The clipboard text is sent to Baidu Translate <b>only when the hotkey is pressed</b>; the key stays on this computer and never reaches the phone or the log. See docs/GUIDE.md.</p>
+        <div class="grid2">
+          <div class="field"><label for="translateHotkeyInput" data-i18n="s.translate.hotkey">Hotkey</label><input id="translateHotkeyInput" type="text" data-bind="translate.hotkey" spellcheck="false" placeholder="ctrl+alt+d"></div>
+          <div class="field"><label for="translateAppIdInput" data-i18n="s.translate.appId">APPID</label><input id="translateAppIdInput" type="text" data-bind="translate.appId" autocomplete="off" spellcheck="false"></div>
+          <div class="field"><label for="translateKeyInput" data-i18n="s.translate.key">Key</label><input id="translateKeyInput" type="password" data-bind="translate.key" autocomplete="off"></div>
+          <div class="field"><label for="translateMaxCharsInput" data-i18n="s.translate.maxChars">Longest text (characters)</label><input id="translateMaxCharsInput" type="number" data-bind="translate.maxChars" data-type="int" min="100" max="6000" step="100"></div>
+        </div>
+        <div class="row"><button class="btn sm" id="translateTest" data-i18n="s.test">Test</button><span class="hint" id="translateState"></span></div>
+      </div>
+
+      <div class="card">
         <h3 data-i18n="s.obs.title">OBS Studio</h3>
         <div class="row" style="margin-bottom:8px"><label class="switch"><input type="checkbox" data-bind="obs.enabled"><span></span></label> <span data-i18n-html="s.obs.enable">Connect to OBS (for the <b>OBS</b> widget, the On air widget and rules)</span></div>
         <p class="hint" style="margin:0 0 12px" data-i18n-html="s.obs.hint">In OBS: Tools › WebSocket Server Settings › <i>Enable WebSocket server</i>; copy the password from <i>Show Connect Info</i>.</p>
@@ -2424,6 +2437,30 @@ $('obsTest').onclick = async () => {
     $('obsState').textContent = r.result;
   } catch (_) { $('obsState').textContent = 'Could not check'; }
 };
+
+// ---------------------------------------------------------------- translate (Baidu Translate)
+$('translateTest').onclick = async () => {
+  $('translateState').textContent = t('s.translate.testing');
+  try {
+    // the fields as they stand, so a wrong key can be tried without saving it first
+    const body = JSON.stringify({ appId: $('translateAppIdInput').value || null, key: $('translateKeyInput').value || null });
+    const r = await (await fetch('/api/translate/test', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body })).json();
+    $('translateState').textContent = r.result ? t('s.translate.testOk', { result: r.result }) : t('s.translate.testFail', { error: r.error });
+  } catch (_) { $('translateState').textContent = t('s.translate.testFail', { error: t('s.translate.network') }); }
+};
+
+// the agent answers with the hotkey's state; loaded with the settings and again after a save
+async function loadTranslateState() {
+  try {
+    const r = await (await fetch('/api/translate/status')).json();
+    const hotkey = $('translateHotkeyInput').value || 'ctrl+alt+d';
+    $('translateState').textContent = !r.active ? t('s.translate.stateOff')
+      : r.hotkey === 'registered' ? t('s.translate.stateOn', { hotkey })
+      : r.hotkey === 'taken' ? t('s.translate.stateTaken', { hotkey })
+      : r.hotkey === 'invalid' ? t('s.translate.stateInvalid', { hotkey })
+      : t('s.translate.stateOff');
+  } catch (_) { $('translateState').textContent = ''; }
+}
 // ---------------------------------------------------------------- app console
 const consoleKeysText = (p) => (p.keys || []).map((k) => (k.label && k.label !== k.keys ? `${k.label} = ${k.keys}` : k.keys)).join('\n');
 const consoleKeysParse = (text) => text.split('\n').map((line) => line.trim()).filter(Boolean).map((line) => {
@@ -3780,7 +3817,7 @@ async function load() {
   // baseline is taken after they ran: otherwise a freshly loaded page already counts as unsaved, and Revert can never
   // get back to a clean state
   saved = JSON.stringify(cfg);
-  changed(); loadInfo(); loadPhones();
+  changed(); loadInfo(); loadPhones(); loadTranslateState();
 }
 
 // one save at a time: pressing Save or Ctrl/Cmd+S again while it runs joins the save in flight, and the busy

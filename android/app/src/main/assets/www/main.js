@@ -61,7 +61,7 @@ export const $ = (id) => document.getElementById(id);
 // The native bridge (window.Android) is in every frame, sandboxed widgets included, so each call carries a key that only
 // the panel's own frames receive (MainActivity.bridgeKey). This wrapper adds it.
 const BRIDGE = ['battery', 'buzz', 'haptic', 'is24Hour', 'pcs', 'selectPc', 'forgetPc', 'setBrightness', 'setHomeScreen', 'setOrientation',
-  'setPinned', 'setVolumeKeys', 'setLanguage', 'transport', 'sensors', 'version', 'canListen', 'listen', 'stopListening', 'cancelListening', 'trackpad', 'canWake', 'wakePc'];
+  'setPinned', 'setVolumeKeys', 'setLanguage', 'transport', 'sensors', 'version', 'canListen', 'listen', 'stopListening', 'cancelListening', 'trackpad', 'canWake', 'wakePc', 'speak'];
 export const bridge = typeof Android === 'undefined' ? null : Object.fromEntries(BRIDGE.filter((m) => typeof Android[m] === 'function')
   .map((m) => [m, (...args) => Android[m](window.__phoneboxKey || '', ...args)]));
 // Live preview inside the agent's layout editor: the layout comes from the editor (unsaved), not from the agent.
@@ -483,6 +483,52 @@ export function toast(msg, kind = '', title = '', seconds = 2.6) {
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => (t.className = 'toast ' + kind), Math.max(1, seconds) * 1000);
 }
+
+// ---------------------------------------------------------------- translate card (a `translate` panel event)
+let translateTimer = 0;
+let translateCard = null;
+
+/** Fills the card with one translation (or its error) and hides it again after its seconds. */
+export function showTranslate(d) {
+  const box = $('translate');
+  $('trSource').textContent = d.source || '';
+  $('trTarget').textContent = d.error
+    ? t('panel.translate.' + d.error) + (d.detail ? ' · ' + d.detail : '')
+    : (d.target || '');
+  translateCard = d;
+  // only the source text is read, and only when the phone app can: a missing voice or an old app leaves no button
+  const speak = $('trSpeak');
+  speak.hidden = !!d.error || !d.lang || typeof bridge?.speak !== 'function';
+  speak.classList.remove('on');
+  box.className = d.error ? 'err' : '';
+  box.hidden = false;
+  // the panel must be awake while the card is up, and count its idle time from now, like a permission prompt
+  undim();
+  lastTouch = Date.now();
+  clearTimeout(translateTimer);
+  translateTimer = setTimeout(hideTranslate, Math.max(1, +d.seconds || 30) * 1000);
+}
+
+export function hideTranslate() {
+  clearTimeout(translateTimer);
+  if ($('translate').hidden) return;
+  $('translate').hidden = true;
+  $('trSpeak').classList.remove('on');
+  translateCard = null;
+}
+
+// the utterance button: a tap asks the phone to read, a tap while it reads stops it
+$('trSpeak').replaceChildren(icon('volume-2'));
+$('trSpeak').addEventListener('click', () => {
+  const card = translateCard;
+  if (!card || typeof bridge?.speak !== 'function') return;
+  const answer = bridge.speak(card.source || '', card.lang || '');
+  if (answer === 'no-tts' || answer === 'no-voice') toast(t('panel.translate.' + (answer === 'no-tts' ? 'noTts' : 'noVoice')), 'err');
+  else $('trSpeak').classList.toggle('on', answer === '');
+});
+// the phone app reports the end of an utterance, so the button stops looking pressed
+window.onAndroidTts = (kind) => { if (kind === 'done') $('trSpeak').classList.remove('on'); };
+
 
 // ---------------------------------------------------------------- charts
 export function sizeCanvas(c) {
@@ -1428,6 +1474,7 @@ export function handleEvent(e) {
   if (PREVIEW && (e.kind === 'goto' || e.kind === 'back' || e.kind === 'reload')) return; // the editor picks the page
   if (e.kind === 'approval' || e.kind === 'approval-done') loadApprovals();
   else if (e.kind === 'notify' && e.data) handleNotify(e.data);
+  else if (e.kind === 'translate' && e.data) showTranslate(e.data);
   else if (e.kind === 'goto' && e.data) requestPage(e.data);
   else if (e.kind === 'back' && e.data) requestBack(e.data.rule);
   else if (e.kind === 'refresh') { loadConfig(); loadQuotas(); loadWork(); loadPush(); loadWeather(true); loadCalendar(); }
@@ -2233,6 +2280,7 @@ document.addEventListener('keydown', (e) => {
 });
 window.onAndroidBack = () => {
   if (!$('approval').hidden) return; // answer it (or let it time out); Back must not dismiss a permission prompt
+  if (!$('translate').hidden) { hideTranslate(); return; } // a card answers to Back before the page does
   const noteEdit = document.querySelector('.note-edit');
   if (noteEdit) { noteEdit.remove(); return; }
   if (closeSessionDetails()) return;

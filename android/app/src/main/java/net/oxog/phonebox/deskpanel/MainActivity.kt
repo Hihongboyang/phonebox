@@ -72,6 +72,8 @@ class MainActivity : Activity(), SensorEventListener {
     // Set first in onDestroy: dictation and stream callbacks already queued on the UI thread then skip the destroyed WebView.
     private var destroyed = false
     private val dictation by lazy { Dictation(this) { script -> if (!destroyed) web.evaluateJavascript(script, null) } }
+    // started in onCreate, so the engine is connected before the first Read-aloud tap; told through the main thread only
+    private val speaker by lazy { Speaker(this) { script -> runOnUiThread { if (!destroyed) web.evaluateJavascript(script, null) } } }
     private lateinit var link: AgentLink
     private lateinit var stream: AgentStream
     @Volatile private var resumed = false
@@ -149,6 +151,7 @@ class MainActivity : Activity(), SensorEventListener {
         if (documentStartKey)
             WebViewCompat.addDocumentStartJavaScript(web, panelBootstrap(), setOf("https://$ASSET_HOST"))
         web.addJavascriptInterface(Bridge(), "Android")
+        speaker.start()
         // Lets you debug the panel from the computer via chrome://inspect.
         WebView.setWebContentsDebuggingEnabled(BuildConfig.DEBUG)
 
@@ -340,6 +343,7 @@ class MainActivity : Activity(), SensorEventListener {
     override fun onPause() {
         resumed = false
         dictation.cancel(0) // the microphone is never left open behind another app or a dark screen
+        speaker.stop() // nothing is read aloud behind another app or a dark screen
         sensors?.unregisterListener(this)
         stream.stop()
         // WebView.onPause() leaves JavaScript running: tell the panel to stop polling and refreshing while nobody sees it
@@ -354,6 +358,7 @@ class MainActivity : Activity(), SensorEventListener {
         destroyed = true
         resumed = false
         dictation.cancel(0)
+        speaker.shutdown()
         sensors?.unregisterListener(this)
         stream.stop()
         link.trackpadSocket.close()
@@ -621,6 +626,14 @@ class MainActivity : Activity(), SensorEventListener {
 
         @JavascriptInterface
         fun cancelListening(key: String, id: Int) { if (ok(key) && id > 0) dictation.cancel(id) }
+
+        /**
+         * Translate card: reads [text] aloud in the voice of [tag] (a BCP 47 tag) with the phone's own engine. Returns
+         * "" when the reading started, or a reason for the panel (see Speaker.speak).
+         */
+        @JavascriptInterface
+        fun speak(key: String, text: String, tag: String): String =
+            if (!ok(key)) "denied" else speaker.speak(text, tag.take(20).filter { it.isLetterOrDigit() || it == '-' })
     }
 
     companion object {

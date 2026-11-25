@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 
 namespace PhoneBox.Agent;
@@ -50,6 +51,9 @@ public sealed class AgentConfig
     public ConsoleConfig Console { get; set; } = new();
     /// <summary>Steam friends presence (the Web API key stays on this computer and is never sent to the phone).</summary>
     public SteamConfig Steam { get; set; } = new();
+
+    /// <summary>Translate hotkey (Windows): the Chinese translation of the clipboard on the phone. Off by default; the Baidu key stays on this computer.</summary>
+    public TranslateConfig Translate { get; set; } = new();
 
     /// <summary>The pages a phone shows: its own selection (Settings › Phones), or all of them.</summary>
     public IEnumerable<PageConfig> PagesFor(string? deviceId)
@@ -480,6 +484,22 @@ public sealed class HomeAssistantConfig
     public string? Token { get; set; }
 }
 
+/// <summary>Baidu Translate's credentials and the hotkey of the Translate card (see TranslateService).</summary>
+public sealed class TranslateConfig
+{
+    public const string DefaultHotkey = "ctrl+alt+d";
+    public const int DefaultMaxChars = 1000;
+
+    public bool Enabled { get; set; }
+    /// <summary>For example "ctrl+alt+d": one or more of ctrl, alt, shift and win, then one key (see Hotkeys.Parse).</summary>
+    public string Hotkey { get; set; } = DefaultHotkey;
+    public string? AppId { get; set; }
+    /// <summary>Signs the requests to Baidu. It is never sent to the phone and never logged.</summary>
+    public string? Key { get; set; }
+    /// <summary>At most this many characters of the clipboard are translated, 100 to 6000 (Baidu's limit per request).</summary>
+    public int MaxChars { get; set; } = DefaultMaxChars;
+}
+
 public sealed class PhoneConfig
 {
     /// <summary>The id the phone sends (X-PhoneBox-Device).</summary>
@@ -560,6 +580,24 @@ public sealed partial class ConfigStore(string path)
         if (proposed?.Steam is not { ApiKey: null } steam || storedKey is null) return false;
         steam.ApiKey = storedKey;
         return true;
+    }
+
+    /// <summary>Retain the Baidu Translate key redacted from settings GETs when a client sends it back as missing or null.</summary>
+    internal static bool PreserveTranslateKey(AgentConfig? proposed, string? storedKey)
+    {
+        if (proposed?.Translate is not { Key: null } translate || storedKey is null) return false;
+        translate.Key = storedKey;
+        return true;
+    }
+
+    /// <summary>
+    /// Leaves the secrets out of the settings handed to anything but the settings page: the Steam key, as before, and
+    /// the Baidu Translate key.
+    /// </summary>
+    internal static void RemoveSecrets(JsonObject? settings)
+    {
+        if (settings?["steam"] is JsonObject steam) steam.Remove("apiKey");
+        if (settings?["translate"] is JsonObject translate) translate.Remove("key");
     }
 
     private readonly Lock _lock = new();
@@ -803,6 +841,11 @@ public sealed partial class ConfigStore(string path)
         c.Steam ??= new();
         c.Steam.SteamId = string.IsNullOrWhiteSpace(c.Steam.SteamId) ? null : c.Steam.SteamId.Trim();
         c.Steam.ApiKey = string.IsNullOrWhiteSpace(c.Steam.ApiKey) ? null : c.Steam.ApiKey.Trim();
+        c.Translate ??= new();
+        c.Translate.Hotkey = string.IsNullOrWhiteSpace(c.Translate.Hotkey) ? TranslateConfig.DefaultHotkey : c.Translate.Hotkey.Trim().ToLowerInvariant();
+        c.Translate.AppId = string.IsNullOrWhiteSpace(c.Translate.AppId) ? null : c.Translate.AppId.Trim();
+        c.Translate.Key = string.IsNullOrWhiteSpace(c.Translate.Key) ? null : c.Translate.Key.Trim();
+        c.Translate.MaxChars = Math.Clamp(c.Translate.MaxChars, 100, 6000);
         if (string.IsNullOrWhiteSpace(c.Obs.Url)) c.Obs.Url = "ws://127.0.0.1:4455";
         c.HomeAssistant ??= new();
         c.HomeAssistant.Url = string.IsNullOrWhiteSpace(c.HomeAssistant.Url) ? null : c.HomeAssistant.Url.Trim().TrimEnd('/');

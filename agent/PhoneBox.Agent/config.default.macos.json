@@ -34,6 +34,9 @@
   "console": { "profiles": [] },
   // Steam friends widget: enter your SteamID64 and a user Web API key in Settings › General (see docs/STEAM.md)
   "steam": { "enabled": false, "steamId": null, "apiKey": null },
+  // Translate hotkey (Windows): Ctrl+Alt+D shows the Chinese translation of the clipboard on the phone, through Baidu Translate.
+  // Off until it is enabled with an APPID and a key in Settings › General › Translate; the text goes to Baidu only when the hotkey is pressed.
+  "translate": { "enabled": false, "hotkey": "ctrl+alt+d", "appId": null, "key": null, "maxChars": 1000 },
 
   // Night mode: between these times the screen dims and only the clock stays. Tap to wake it for 30 s.
   "night": { "enabled": true, "start": "00:30", "end": "07:30", "brightness": 0.02 },
