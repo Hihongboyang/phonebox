@@ -1,0 +1,31 @@
+schema: spec-driven-contracts
+
+context: |
+  Tech stack: PhoneBox. Agent = C# / .NET 10 (ASP.NET Core minimal API, WinForms tray on Windows) in agent/PhoneBox.Agent.
+  Phone app = Kotlin (minSdk 21) hosting the panel in the system WebView, in android/. Panel = plain ES modules in android/app/src/main/assets/www.
+  Tests: xUnit agent/PhoneBox.Agent.Tests (builds the agent as net10.0 with WINDOWS undefined), Playwright tools/ui-tests, Gradle lint and unit tests (CI only).
+  Binding conventions: CONTRIBUTING.md (security model, privacy, off-by-default outbound connections) and docs/DEVELOPMENT.md (commands, source layout).
+  Agent context file: AGENTS.md
+  Glossary: docs/GLOSSARY.md — use its terms exactly; one term per concept.
+  Contracts live in code, not prose: shared type files are the single source of truth.
+
+rules:
+  proposal:
+    - Always include a "Non-Goals" section
+    - Name the existing modules and flows this change reuses
+  design:
+    - Include a "Module Map" section listing every new or modified file and what lives in it
+    - Include a "Data Flow" section naming each stage's owner
+    - Reference checked-in type contract files instead of re-describing field shapes in prose
+    - Every decision records its rejected alternatives and why
+    - New user-facing surfaces get a UI Design section (wireframe + empty/loading/error/success states)
+  specs:
+    - Write each WHEN/THEN scenario so it maps 1:1 onto a test case
+    - Reference exact type and file names instead of paraphrasing them
+  contracts:
+    - Declare shapes as TypeScript blocks, never prose descriptions
+    - Name every channel and persisted key exactly once; code implements these names verbatim
+    - Changing a declared shape requires a decision record in design.md first
+  tasks:
+    - Every task ends with its verification step (test file, typecheck, or lint), never a bare "implement X"
+    - 'Order test-first: each implementation task is immediately preceded by its failing-test task (verified RED), and completes only when that test turns GREEN'
